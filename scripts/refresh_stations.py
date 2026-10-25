@@ -31,6 +31,10 @@ HEALTH = os.path.join(ROOT, "health.json")
 STRIKES = 2
 MIN_STATIONS = 500          # the app ignores a smaller list (StationListValidator.MIN_STATIONS)
 MAX_SHRINK = 0.25           # refuse to drop more than this share of the published list at once
+# Many Indian streams refuse or time out from GitHub's (mostly US) runners while working fine
+# in India, so this job never removes them; it only brings dead ones back. Indian stations are
+# removed by the local check in the app project, which runs from India.
+NEVER_REMOVE_COUNTRIES = {"IN"}
 UA = "Mozilla/5.0 (Linux; Android 14) AstrotuneRadio/1.0"
 SSL_CTX = ssl.create_default_context()
 
@@ -98,7 +102,13 @@ def main():
         before = health.get(sid, 0 if sid in previous_ids else STRIKES)
         new_health[sid] = 0 if results[sid] == "ok" else min(before + 1, 99)
 
-    published = [s for s in master if new_health[s["id"]] < STRIKES]
+    def keep(station):
+        sid = station["id"]
+        if station.get("countryCode") in NEVER_REMOVE_COUNTRIES and sid in previous_ids:
+            return True
+        return new_health[sid] < STRIKES
+
+    published = [s for s in master if keep(s)]
     published_ids = {s["id"] for s in published}
 
     if len(published) < MIN_STATIONS:

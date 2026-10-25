@@ -19,6 +19,9 @@ A GitHub Actions job (`.github/workflows/refresh-stations.yml`) runs every Monda
 - A station is removed after its stream fails **2 weekly checks in a row**, so a short
   outage doesn't remove it.
 - A removed station comes back the first week its stream answers again.
+- **Indian stations are never removed by this job**, only brought back. Many Indian streams
+  refuse or time out from GitHub's servers (mostly in the US) while working fine in India.
+  Dead Indian stations are removed when the list is rebuilt locally in the app project.
 - The run stops without changing anything if too few streams answer (for example if the
   runner lost its network), if fewer than 500 stations would remain (the app would reject
   the list), or if more than a quarter of the list would disappear at once. A failed run
@@ -26,9 +29,9 @@ A GitHub Actions job (`.github/workflows/refresh-stations.yml`) runs every Monda
 
 To run it now: **Actions** tab → **Refresh station list** → **Run workflow**.
 
-The checks run from GitHub's servers (mostly in the US), so a stream that only works from
-India could look dead. The two-strike rule and the limits above keep that from removing
-large parts of the list, but watch the run summaries for Indian stations being dropped.
+Because the checks run from the US, some US stations that only answer there are listed
+even though they may not play in India. The app moves stations that keep failing to the end
+of its lists.
 
 ## Changing the station list
 
