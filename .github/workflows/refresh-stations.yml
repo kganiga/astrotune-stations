@@ -1,0 +1,53 @@
+name: Refresh station list
+
+on:
+  schedule:
+    - cron: "30 0 * * 1"   # Mondays 00:30 UTC (06:00 IST)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-stations
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Re-check streams
+        run: python scripts/refresh_stations.py
+
+      - name: Commit and push if changed
+        id: commit
+        run: |
+          if git diff --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          if git diff --quiet -- stations.json; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            message="Update station health"
+          else
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            message="Weekly refresh ($(python -c 'import json; print(len(json.load(open("stations.json", encoding="utf-8"))))') stations)"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stations.json health.json
+          git commit -m "$message"
+          git push
+
+      # jsDelivr caches the branch for up to 12 hours; ask it to fetch the new file now.
+      - name: Refresh jsDelivr
+        if: steps.commit.outputs.published == 'true'
+        continue-on-error: true   # phones still get the update, just up to 12 hours later
+        run: curl --fail --silent --show-error --max-time 30 "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/stations.json"
